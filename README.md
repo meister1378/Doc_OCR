@@ -1,310 +1,139 @@
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/9ad1ffce-2310-4f80-a3cd-7a117bfb4f17" width="300px"></a>
-</p>
+# PaddleOCR-VL (LoRA) SFT 실행 가이드 (데이터 생성 → 학습 → 최종 모델 저장)
 
-<div align="center">
+개발 환경은 리눅스(WSL2)입니다.
 
-[ERNIE Bot](https://ernie.baidu.com/) |  [🤗Hugging Face](https://huggingface.co/baidu) | [AI Studio](https://aistudio.baidu.com/modelsoverview)
-
-📑 [Blog](https://yiyan.baidu.com/blog/posts/ernie4.5) | 📚 [Cookbook](./cookbook/) | 📑 [Paper](https://yiyan.baidu.com/blog/publication/)  | 🛠️ [Training](./docs/erniekit.md)  | ⚡️ [Deploy](https://github.com/PaddlePaddle/FastDeploy)
-
-<a href="https://trendshift.io/repositories/14169" target="_blank"><img src="https://trendshift.io/api/badge/repositories/14169" alt="PaddlePaddle%2FERNIE | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-</div>
-
-## 📣 Recent updates
-
-**[2025-10] 🔥 Released ERNIEKit v1.4:**
-
-- **New Features**
-    - VL Model Training: Support SFT for [PaddleOCR-VL-0.9B]((https://huggingface.co/PaddlePaddle/PaddleOCR-VL/tree/main/PaddleOCR-VL-0.9B)) model. More details in [PaddleOCR-VL-0.9B SFT](./docs/paddleocr_vl_sft.md).
-    - Dataflow : Support padding-free startegy.
-        - Packing data within a batch into a sequence to avoid padding, thereby reducing GPU memory usage and accelerating training.
-
-**[2025-09] 🔥 Released ERNIEKit v1.3:**
-
-- **New Features**
-    - [ERNIE-4.5-21B-A3B-Thinking] Supports SFT training and function call training for ERNIE-4.5-21B-A3B-Thinking (https://huggingface.co/baidu/ERNIE-4.5-21B-A3B-Thinking).
-
-- **Bug Fixes:**
-    - [VL Model Training] Optimization of multimodal video data processing speed (#1266).
-
-**[2025-09] 🔥 Released ERNIEKit v1.2:**
-
-- **New Features**
-    - [WebUI] Added support for training and conversation functionalities with ERNIE 28b/424b VL models.
-    - [VL Model Training] Introduced support for query-response format in training data.
-    - [Command-Line Tool] Added iluvatar GPU hardware support.
-
-- **Bug Fixes:**
-    - [AutoParallel] Fix use_intermediate_api pp+recompute+moe bug (#1250)
-    - [AutoParallel] Fix save checkpoint bug (#1242)
-    - [VL Model Training] Fix lora 128k training bug (#1234)
-
-**[2025-09] 🔥 Released ERNIEKit v1.1:** ERNIEKit now supports SFT/LoRA for ERNIE-4.5-VL series.
-
-**[2025-06] 🔥 Released ERNIEKit v1.0:** We're excited to announce ERNIEKit v1.0, the most powerful and efficient toolkit yet for developing with the latest ERNIE models!
-
-## Introduction to ERNIE 4.5
-
-We introduce ERNIE 4.5, a new family of large-scale multimodal models comprising 10 distinct variants. The model family consist of Mixture-of-Experts (MoE) models with 47B and 3B active parameters, with the largest model having 424B total parameters, as well as a 0.3B dense model. For the MoE architecture, we propose a novel heterogeneous modality structure, which supports parameter sharing across modalities while also allowing dedicated parameters for each individual modality.  This MoE architecture has the advantage to enhance multimodal understanding without compromising, and even improving, performance on text-related tasks. All of our models are trained with optimal efficiency using the [PaddlePaddle](https://github.com/PaddlePaddle/Paddle) deep learning framework, which also enables high-performance inference and streamlined deployment for them. We achieve 47% Model FLOPs Utilization (MFU) in our largest ERNIE 4.5 language model pre-training. Experimental results show that our models achieve state-of-the-art performance across multiple text and multimodal benchmarks, especially in instruction following, world knowledge memorization, visual understanding and multimodal reasoning. All models are publicly accessible under Apache 2.0 to support future research and development in the field. Additionally, we open source the development toolkits for ERNIE 4.5, featuring industrial-grade capabilities, resource-efficient training and inference workflows, and multi-hardware compatibility.
-
-</br>
-
-<div align="center">
-
- **ERNIE 4.5**
-<table style="table-layout: auto; border-collapse: collapse; border: 1px solid #ddd; text-align: center;">
-  <thead class="ant-table-thead">
-    <tr>
-      <th colspan="2" style="border: 1px solid #ddd;text-align: center;background: lightgray;vertical-align: middle;color:black" >ERNIE 4.5 Models </th>
-      <th colspan="3" style="border: 1px solid #ddd;text-align: center;background: lightgray;vertical-align: middle;color:black">Model Information</th>
-    </tr>
-    <tr>
-      <th style="border: 1px solid #ddd;width: 100px;text-align: center;background: lightgray;vertical-align: middle;color:black">Model Category</th>
-      <th style="border: 1px solid #ddd;width: 250px;text-align: center;background: lightgray;vertical-align: middle;color:black">Model</th>
-      <th style="border: 1px solid #ddd; width: 100px;text-align: center;background: lightgray;vertical-align: middle;color:black">Input Modality</th>
-      <th style="border: 1px solid #ddd; width: 100px;text-align: center;background: lightgray;vertical-align: middle;color:black">Output Modality</th>
-      <th style="border: 1px solid #ddd; width: 100px;text-align: center;background: lightgray;vertical-align: middle;color:black">Context Window
-
-</th>
-    </tr>
-  </thead>
-  <tbody class="ant-table-tbody">
-    <tr>
-      <td rowspan="4" style="border: 1px solid #ddd;vertical-align: middle;">Large Language Models (LLMs)</td>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-300B-A47B-Base</td>
-      <td rowspan="4"style="border: 1px solid #ddd;">Text</td>
-      <td rowspan="4"style="border: 1px solid #ddd;">Text</td>
-      <td rowspan="10" style="border: 1px solid #ddd;">128K</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-300B-A47B</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-21B-A3B-Base</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-21B-A3B</td>
-    </tr>
-    <tr>
-      <td rowspan="4" style="border: 1px solid #ddd;vertical-align: middle;"> Vision-Language Models (VLMs)</td>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-VL-424B-A47B-Base</td>
-      <td rowspan="4"style="border: 1px solid #ddd;">Text/Image/Video</td>
-      <td rowspan="4"style="border: 1px solid #ddd;">Text</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-VL-424B-A47B</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-VL-28B-A3B-Base</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-VL-28B-A3B</td>
-    </tr>
-    <tr>
-      <td rowspan="2" style="border: 1px solid #ddd;vertical-align: middle;">Dense Models</td>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-0.3B-Base</td>
-      <td rowspan="2"style="border: 1px solid #ddd;">Text</td>
-      <td rowspan="2"style="border: 1px solid #ddd;">Text</td>
-    </tr>
-    <tr>
-      <td style="border: 1px solid #ddd;">ERNIE-4.5-0.3B</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-_Note: All models (including pre-trained weights and inference code) have been released on [🤗Hugging Face](https://huggingface.co/baidu), and [AI Studio](https://aistudio.baidu.com/index). Check our [blog](https://yiyan.baidu.com/blog/posts/ernie4.5) for more details._
-
-</br>
-
-## Highlights
-
-Our model family is characterized by three key innovations:
-
-1. **Multimodal Heterogeneous MoE Pre-Training:** Our models are jointly trained on both textual and visual modalities to better capture the nuances of multimodal information and improve performance on tasks involving text understanding and generation, image understanding, and cross-modal reasoning. To achieve this without one modality hindering the learning of another, we designed a *heterogeneous MoE structure*, incorporated *modality-isolated routing*, and employed *router orthogonal loss* and *multimodal token-balanced loss*. These architectural choices ensure that both modalities are effectively represented, allowing for mutual reinforcement during training.
-
-2. **Scaling-Efficient Infrastructure:** We propose a novel heterogeneous hybrid parallelism and hierarchical load balancing strategy for efficient training of ERNIE 4.5 models. By using intra-node expert parallelism, memory-efficient pipeline scheduling, FP8 mixed-precision training and finegrained recomputation methods, we achieve remarkable pre-training throughput. For inference, we propose *multi-expert parallel collaboration* method and *convolutional code quantization* algorithm to achieve 4-bit/2-bit lossless quantization. Furthermore, we introduce PD disaggregation with dynamic role switching for effective resource utilization to enhance inference performance for ERNIE 4.5 MoE models. Built on [PaddlePaddle](https://github.com/PaddlePaddle/Paddle), ERNIE 4.5 delivers high-performance inference across a wide range of hardware platforms.
-
-3. **Modality-Specific Post-Training:** To meet the diverse requirements of real-world applications, we fine-tuned variants of the pre-trained model for specific modalities. Our LLMs are optimized for general-purpose language understanding and generation. The VLMs focuses on visuallanguage understanding and supports both thinking and non-thinking modes. Each model employed a combination of *Supervised Fine-tuning (SFT)*, *Direct Preference Optimization (DPO)* or a modified reinforcement learning method named *Unified Preference Optimization (UPO)* for post-training.
-
-</br>
-
-## Performance and Benchmark Results
-
-ERNIE-4.5-300B-A47B-Base surpasses DeepSeek-V3-671B-A37B-Base on 22 out of 28 benchmarks, demonstrating leading performance across all major capability categories. This underscores the substantial improvements in generalization, reasoning, and knowledge-intensive tasks brought about by scaling up the ERNIE-4.5-Base model relative to other state-of-the-art large models. With a total parameter size of 21B (approximately 70% that of Qwen3-30B), ERNIE-4.5-21B-A3B-Base outperforms Qwen3-30B-A3B-Base on several math and reasoning benchmarks, including BBH and CMATH. ERNIE-4.5-21B-A3B-Base remains highly competitive given its significantly smaller model size, demonstrating notable parameter efficiency and favorable performance trade-offs.
-
-ERNIE-4.5-300B-A47B, the post trained model, demonstrates significant strengths in instruction following and knowledge tasks, as evidenced by the state-of-the-art scores on benchmarks such as IFEval, Multi-IF, SimpleQA, and ChineseSimpleQA. The lightweight model ERNIE-4.5-21B-A3B achieves competitive performance compared to Qwen3-30B-A3B, despite having approximately 30% fewer total parameters.
-
-In the non-thinking mode, ERNIE-4.5-VL exhibits outstanding proficiency in visual perception, document and chart understanding, and visual knowledge, performing strongly across a range of established benchmarks. Under the thinking mode, ERNIE-4.5-VL not only demonstrates enhanced reasoning abilities compared to the non-thinking mode, but also retains the strong perception capabilities of the latter. ERNIE-4.5-VL-424B-A47B delivers consistently strong results across the full multimodal evaluation suite. Its thinking mode provides a distinct advantage on reasoning-centric tasks, narrowing or even surpassing the gap to OpenAI-o1 on challenging benchmarks such as MathVista, MMMU, and VisualPuzzle, while maintaining competitive performance on perception-focused datasets like CV-Bench and RealWorldQA. The lightweight vision-language model ERNIE-4.5-VL-28B-A3B achieves competitive or even superior performance compared to Qwen2.5-VL-7B and Qwen2.5-VL-32B across most benchmarks, despite using significantly fewer activation parameters. Notably, our lightweight model also supports both thinking and non-thinking modes, offering functionalities consistent with ERNIE-4.5-VL-424B-A47B.
-
-### Performace of ERNIE-4.5 pre-trained models
-
-<div align="center">
-<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/base_model_benchmark.png" style="max-width: 80%; height: auto;">
-</div>
-
-### Performance of post-trained model ERNIE-4.5-300B-A47B
-
-<div align="center">
-<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/chat_model_benchmark1.png" style="max-width: 80%; height: auto;">
-</div>
-
-### Performance of post-trained model ERNIE-4.5-21B-A3B
-
-<div align="center">
-<img src="https://github.com/user-attachments/assets/5bacaae8-ef27-494d-8c65-589ba187a084" style="max-width: 80%; height: auto;">
-</div>
-
-### Performance of post-trained multimodal models in thinking mode
-
-<div align="center">
-<img src="https://yiyan.baidu.com/blog/posts/ernie4.5/vl_model_thinking_benchmark.png" style="max-width: 80%; height: auto;">
-</div>
-
-### Performance of post-trained multimodal models in non-thinking mode
-
-<div align="center">
-<img src="https://github.com/user-attachments/assets/3ad69a9d-1233-48be-a7c4-b816d3aa17ca" style="max-width: 80%; height: auto;">
-</div>
-
-</br>
-
-## Model Development
-
-ERNIE 4.5 models are trained and deployed for inference using the [PaddlePaddle]((https://github.com/PaddlePaddle/Paddle)) framework. The full workflow of training, compression, and inference for ERNIE 4.5 is supported through the [ERNIEKit](./docs/erniekit.md) and [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) toolkit. The table below details the feature matrix of the ERNIE 4.5 model family for training and inference.
-<div align="center">
-
-| Model             |  Training      |  Inference              |
-| ------------------------------ | ------------------------- | -------------------------------- |
-| ERNIE-4.5-300B-A47B-Base       | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-300B-A47B            | SFT/SFT-LoRA/DPO/DPO-LoRA/QAT | BF16 / W4A16C16 / W8A16C16 / W4A8C8 / FP8  / 2Bits |
-| ERNIE-4.5-21B-A3B-Base         | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-21B-A3B              | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-VL-424B-A47B-Base    | Coming Soon               | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-VL-424B-A47B         | Coming Soon               | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-VL-28B-A3B-Base      | Coming Soon               | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-VL-28B-A3B           | Coming Soon               | BF16 / W4A16C16 / W8A16C16 / FP8 |
-| ERNIE-4.5-0.3B-Base            | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W8A16C16 / FP8            |
-| ERNIE-4.5-0.3B                 | SFT/SFT-LoRA/DPO/DPO-LoRA | BF16 / W8A16C16 / FP8            |
-
-</div>
-
-_Note: For different ERNIE 4.5 model, we provide diverse quantization schemes using the notation WxAxCx, where: W indicates weight precision, A indicates activation precision, C indicates KV Cache precision, x represents numerical precision._
+OS: Ubuntu 20.04
+GPU : RTX3060
+CUDA: 11.8
 
 
-### ERNIEKit: ERNIE Development Toolkit Based on PaddlePaddle
+이 문서는 **OCR 데이터 생성(레이아웃 LMDB)**부터 **PaddleOCR-VL LoRA SFT 학습**, 그리고 **`ERNIE/LORA_MODEL_LOADANDSAVE.ipynb`로 최종 병합(merge) 저장**까지 한 번에 따라 실행할 수 있게 정리한 가이드입니다.
 
-**ERNIEKit** is an industrial-grade training and compression development toolkit for ERNIE models based on PaddlePaddle, offering full-cycle development support for the ERNIE 4.5 model family. Key capabilities include:
-* High-performance pre-training implementation
-* Full-parameter supervised fine-tuning (SFT)
-* Direct Preference Optimization (DPO)
-* Parameter-efficient fine-tuning and alignment (SFT-LoRA/DPO-LoRA)
-* Quantization-Aware Training (QAT)
-* Post-Training Quantization (PTQ) [WIP]
+> 데이터 생성 파이프라인의 **데이터 구성/전처리(merged_json, lookup)** 까지는 기존 `ocr_test/OCR_PIPELINE/README.md`와 동일합니다.  
+> 차이는 **`create_all_datasets_layout.py` 실행 시점부터**이며, 생성된 `*_layout.lmdb`를 이용해 본 repo(`ERNIE`)에서 SFT를 진행합니다.
+ 
 
-Minimum hardware requirements for training each model are documented [here](./docs/erniekit.md).
+---
+
+## 0) 전제
+
+- **레이아웃 LMDB 생성 스크립트 위치**: `ocr_test/OCR_PIPELINE/FAST/create_all_datasets_layout.py`
+- **SFT 학습 실행 위치(권장)**: 이 문서가 있는 `ERNIE/` 디렉터리
+- **학습 데이터(예시 경로)**: `/mnt/nas/ocr_dataset/*.lmdb`
+
+---
+
+## 1) (공통) 데이터 준비: merged_json / lookup
+❗ 신규데이터의 경우에는 이미지 및 라벨의 경로의 패턴을 파악하여 새롭게 json과 lookup 파일을 생성하여야합니다.
+> 기존의 merge_json_dataset.py, ftp_tree_viewer.py, convert_lookup_to_pickle.py를 사용할 수 없습니다. 
+- `merge_json_datasets.py`로 `*_merged.json` 준비
+- `ftp_tree_viewer.py` / `convert_lookup_to_pickle.py`로 `lookup_*.pkl.gz` 준비
+> 데이터 생성 파이프라인의 **데이터 구성/전처리(merged_json, lookup)** 까지는 기존 `ocr_test/OCR_PIPELINE/README.md`와 동일합니다.  
+> 차이는 **`create_all_datasets_layout.py` 실행 시점부터**이며, 생성된 `*_layout.lmdb`를 이용해 본 repo(`ERNIE`)에서 SFT를 진행합니다.
+
+---
+
+## 2) layout LMDB 생성 (`create_all_datasets_layout.py`)
+❗**LMDB**는 B+Tree 기반의 key-value 저장소이며, 핵심 특징은 memory-mapped file을 사용해 디스크 데이터를 RAM처럼 빠르게 접근
+> 기존 ERNIE 에서는 이미지 경로와 라벨을 json 파일로 매핑하였으나 학습 데이터의 양이 매우 많기 때문에 LMDB를 사용 
+`create_all_datasets_layout.py`를 실행해 **SFT 학습 입력으로 사용할 layout LMDB**를 생성합니다.
 
 
-#### Quick Start
+### 2-1) (선택) 환경변수
 
-When you install ERNIEKit successfully, you can start training ERNIE 4.5 models with the following command:
+기존 파이프라인과 동일하게 레이아웃/테이블 관련 옵션을 환경변수로 받을 수 있습니다.
 
 ```bash
-# download model from huggingface
-huggingface-cli download baidu/ERNIE-4.5-0.3B-Paddle --local-dir baidu/ERNIE-4.5-0.3B-Paddle
-# 8K Sequence Length, SFT
-erniekit train examples/configs/ERNIE-4.5-0.3B/sft/run_sft_8k.yaml
+export FAST_DEBUG=0
+export FAST_LAYOUT_DEVICE=gpu   # gpu|cpu
+export FAST_TABLE_DEVICE=gpu    # gpu|cpu
+export FAST_LAYOUT_MODEL=PP-DocLayoutV2
+export FAST_TABLE_LAYOUT_THR=0.3
 ```
 
-For detailed guides on installation, CLI usage, WebUI, multi-node training, and advanced features, please refer to [ERNIEKit Training Document](./docs/erniekit.md).
-
-For detailed guides on High-performance pre-training, please refer to [Pre-Training Document](./examples/pre-training/README.md).
-
-
-**ERNIEKit WebUI demo:**
-
-https://github.com/user-attachments/assets/6d44cb92-0826-42df-aa80-7656445e0f73
-
-### FastDeploy：High-performance Inference and Deployment Toolkit for LLMs and VLMs Based on PaddlePaddle
-
-**FastDeploy** is an inference and deployment toolkit for large language models and visual language models, developed based on PaddlePaddle. It delivers production-ready, easy-to-use multi-hardware deployment solutions with multi-level load-balanced PD disaggregation, comprehensive quantization format support, OpenAI API server and vLLM compatible etc.
-
-For installation please refer to [FastDeploy](https://github.com/PaddlePaddle/FastDeploy).
-
-#### Offline Inference
-
-```python
-from fastdeploy import LLM, SamplingParams
-
-prompt = "Write me a poem about large language model."
-sampling_params = SamplingParams(temperature=0.8, top_p=0.95)
-
-llm = LLM(model="baidu/ERNIE-4.5-0.3B-Paddle", max_model_len=32768)
-
-outputs = llm.generate(prompt, sampling_params)
-```
-
-#### Online Serving
+### 2-2) 실행
 
 ```bash
-python -m fastdeploy.entrypoints.openai.api_server \
-    --model "baidu/ERNIE-4.5-0.3B-Paddle" \
-    --max-model-len 32768 \
-    --port 9904
+cd /home/mango/ocr_test/OCR_PIPELINE/FAST
+python create_all_datasets_layout.py
 ```
 
-For more inference and deployment guides, please refer to [FastDeploy](https://github.com/PaddlePaddle/FastDeploy).
+### 2-3) 산출물(예)
 
-</br>
+아래처럼 `*_layout.lmdb`가 생성됩니다.
 
-## Cookbooks
+- `/mnt/nas/ocr_dataset/ocr_public_train_layout.lmdb`
+- `/mnt/nas/ocr_dataset/public_admin_train_layout.lmdb`
 
-Discover best-practice guides showcasing ERNIE’s capabilities across multiple domains:
+---
 
-<div align="center">
+## 3) PaddleOCR-VL LoRA SFT 학습 (erniekit)
+❗RTX 3060 기준이며 배치사이즈나 gradient accumulation size 등은 환경에 맞게 수정
+학습 설정 파일은 아래 yaml을 사용합니다.
 
-| Cookbook | Description | Gradio Demo |
-| --- | --- | --- |
-| [Conversation](/cookbook/notebook/conversation_demo_en.ipynb) | Building conversational applications.  | [conversation_demo.py](/cookbook/conversation_demo.py) |
-| [Simple ERNIE Bot](/cookbook/notebook/simple_ernie_bot_demo_en.ipynb) | Creating a lightweight web-based ERNIE Bot.   |[simple_ernie_bot_demo.py](/cookbook/simple_ernie_bot_demo.py) |
-| [Web-Search-Enhanced Conversation](/cookbook/notebook/web_search_demo_en.ipynb) | Building conversational apps with integrated web search. | [web_search_demo.py](/cookbook/web_search_demo.py) |
-| [Knowledge Retrieval-based Q&A](/cookbook/notebook/knowledge_retrieval_demo_en.ipynb) | Building intelligent Q&A systems with private knowledge bases. | [knowledge_retrieval_demo.py](/cookbook/knowledge_retrieval_demo.py) |
-| [Advanced Search](/cookbook/notebook/advanced_search_demo_en.ipynb)    | Building article-generation applications using deep information extraction. | [advanced_search_demo.py](/cookbook/advanced_search_demo.py) |
-| [SFT tutorial](/cookbook/notebook/sft_tutorial_en.ipynb) | Optimizing task performance through supervised fine-tuning with ERNIEKit. | - |
-| [DPO tutorial](/cookbook/notebook/dpo_tutorial_en.ipynb) | Aligning models with human preferences using ERNIEKit. | - |
-| [Text Recognition](/cookbook/notebook/text_recognition_tutorial_en.ipynb) | A Comprehensive Guide to Developing Text Recognition for Non-Chinese and Non-English Languages Using ERNIE and PaddleOCR. | - |
-| [Document Translation](/cookbook/notebook/document_translation_tutorial_en.ipynb)          |  Document Translation Practice Based on ERNIE and PaddleOCR. | - |
-| [Key Information Extraction](/cookbook/notebook/key_information_extraction_tutorial_en.ipynb) |  Key Information Extraction in Contract Scenarios Based on ERNIE and PaddleOCR. | - |
+- `examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml`
 
-</div>
+`ERNIE/`에서 다음 명령어로 학습합니다.
 
-</br>
+```bash
+cd /home/mango/ERNIE
 
-## Community
-
-| PaddlePaddle WeChat official account |  Join the tech discussion group |
-| :---: | :---: |
-| <img src="https://github.com/user-attachments/assets/864a45ec-0773-44b2-a2f1-c0e21e157792" width="150"> | <img src="https://github.com/user-attachments/assets/52e05674-7143-4207-8b19-67247fe88f55" width="150"> |
-
-## License
-
-The ERNIE 4.5 models are provided under the Apache License 2.0. This license permits commercial use, subject to its terms and conditions.
-</br>
-
-## Citation
-
-If you find ERNIE 4.5 useful or wish to use it in your projects, please kindly cite our technical report:
-
-```bibtex
-@misc{ernie2025technicalreport,
-      title={ERNIE 4.5 Technical Report},
-      author={Baidu-ERNIE-Team},
-      year={2025},
-      eprint={},
-      archivePrefix={arXiv},
-      primaryClass={cs.CL},
-      url={}
-}
+CUDA_VISIBLE_DEVICES=0 erniekit train examples/configs/PaddleOCR-VL/sft/run_ocr_vl_sft_16k.yaml \
+  model_name_or_path=PaddlePaddle/PaddleOCR-VL \
+  train_dataset_path=./mnt/nas/ocr_dataset/ocr_public_train_layout.lmdb \
+  eval_dataset_path=./mnt/nas/ocr_dataset/public_admin_train_layout.lmdb \
+  output_dir=PaddleOCR-VL-SFT-OCRPUBLIC \
+  gradient_accumulation_steps=2
 ```
+
+> 참고: yaml 내부에도 기본값(예: `train_lmdb_paths`, `eval_dataset_path`, `output_dir`, `gradient_accumulation_steps`)이 들어있고, 위 커맨드는 이를 **런타임 override**합니다.
+
+---
+
+## 4) 최종 모델 저장(LoRA 병합) — `LORA_MODEL_LOADANDSAVE.ipynb`
+❗LORA 학습이 종료된 경우 checkpoint나 저장된 경로에 adapter가 생성되는데, 기존에는 peft 라이브러리를 활용하여 모델에 올릴 수 있으나 프레임워크의 차이로 인해 복잡한 방식으로 모델을 올려야함.
+> LORA_MODEL_LOADANDSAVE.ipynb를 활용
+
+학습이 끝나면 `output_dir` 아래에 `checkpoint-xxxxxx/`가 생성됩니다(예: `PaddleOCR-VL-SFT-OCRPUBLIC/checkpoint-250000`).
+
+이 단계에서는 `ERNIE/LORA_MODEL_LOADANDSAVE.ipynb`를 사용해:
+
+- 베이스 모델(`PaddlePaddle/PaddleOCR-VL`) + LoRA 체크포인트를 로드
+- LoRA를 **merge**
+- 최종 가중치를 **`model.safetensors`** 형태로 저장합니다(`safe_serialization=True`)
+
+### 4-1) 노트북 설정(핵심 변수)
+
+노트북 첫 셀에서 아래 두 값을 학습 결과에 맞게 지정합니다.
+
+- `BASE = "PaddlePaddle/PaddleOCR-VL"`
+- `LORA = "/home/mango/ERNIE/PaddleOCR-VL-SFT-OCRPUBLIC/checkpoint-250000"`  ← 본인 체크포인트 경로로 변경
+
+### 4-2) 저장 동작
+
+첫 셀을 실행하면 대략 아래 순서로 진행됩니다.
+
+- `PaddleOCRVLForConditionalGeneration.from_pretrained(BASE, convert_from_hf=True)`
+- `LoRAModel.from_pretrained(base_model, lora_path=LORA)`
+- `lora_model.merge()` → `restore_original_model()`
+- 병합된 모델을 `LORA` 경로에 `save_pretrained(..., safe_serialization=True)`로 저장
+
+### 4-3) safetensors 전치(transpose) 보정
+
+노트북 2번째 셀은 특정 키들의 weight가 전치되어야 하는 케이스를 위해 `model.safetensors`를 읽어 `_fixed.safetensors`로 저장하는 유틸입니다.
+
+- 대상 파일: `.../checkpoint-xxxxxx/model.safetensors`
+- 출력 파일: `.../checkpoint-xxxxxx/model_fixed.safetensors`
+- 안내대로 `model_fixed.safetensors`를 `model.safetensors`로 교체해서 사용합니다.
+
+---
+
+### 4-4) safetensors 전치(transpose) 보정
+❗`"home/mango/ERNIE/PaddlePaddle/PaddleOCR-VL"` 에서 모든 파일을 복사한 후 4-3까지의 과정이 끝난 체크포인트 경로에 붙여넣기를 합니다.
+> 단, 덮어쓰기가 아닌 건너뛰기를 해야함.
+
+이후 tokenizer_config.json을 열고 다음을 검색합니다
+-> "tokenizer_class": 
+-> 매핑된 값이 다른 경우 다음과 같이 변경합니다. "tokenizer_class": "LlamaTokenizer"
+
+### 4-5) HUGGINGFACE에 업로드
